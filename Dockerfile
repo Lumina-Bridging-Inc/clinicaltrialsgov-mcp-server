@@ -12,7 +12,8 @@ WORKDIR /usr/src/app
 COPY package.json bun.lock ./
 
 # Install all dependencies (including dev dependencies for building)
-RUN bun install --frozen-lockfile
+# --ignore-scripts skips the husky prepare hook which fails without a .git dir
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy the rest of the source code
 COPY . .
