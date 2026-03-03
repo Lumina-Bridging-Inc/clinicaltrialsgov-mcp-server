@@ -5,7 +5,7 @@
       "commands": ["bun install --frozen-lockfile --ignore-scripts"]
     },
     "build": {
-      "commands": ["bun run build"]
+      "commands": ["bun scripts/railway-build.ts"]
     }
   },
   "deploy": {
