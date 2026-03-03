@@ -249,6 +249,7 @@ After a version bump and final commit, publish to both npm and GHCR:
 bun publish --access public
 
 docker buildx build --platform linux/amd64,linux/arm64 \
+  -f docker/Dockerfile \
   -t ghcr.io/cyanheads/clinicaltrialsgov-mcp-server:<version> \
   -t ghcr.io/cyanheads/clinicaltrialsgov-mcp-server:latest \
   --push .
