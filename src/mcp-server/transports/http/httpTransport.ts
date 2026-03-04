@@ -43,7 +43,7 @@ class McpSessionTransport extends StreamableHTTPTransport {
   public sessionId: string;
 
   constructor(sessionId: string) {
-    super();
+    super({ enableJsonResponse: true });
     this.sessionId = sessionId;
   }
 }
