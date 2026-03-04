@@ -5,7 +5,7 @@ const result = await Bun.build({
   outdir: './dist',
   target: 'node',
   external: ['pino', 'pino-pretty'],
-  alias: { '@': './src' },
+  alias: { '@/': './src/' },
 });
 
 if (!result.success) {
