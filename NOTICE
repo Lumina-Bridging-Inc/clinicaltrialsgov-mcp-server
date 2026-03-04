@@ -1,0 +1,16 @@
+clinicaltrialsgov-mcp-server
+Copyright 2025 Casey Hand (@cyanheads)
+
+This product includes software developed by Casey Hand (@cyanheads):
+  https://github.com/cyanheads/clinicaltrialsgov-mcp-server
+  Licensed under the Apache License, Version 2.0
+
+This repository is a derivative work of the above project. Modifications
+made by Lumina-Bridging-Inc (https://github.com/Lumina-Bridging-Inc) include:
+  - Railway deployment configuration (railway.toml, railpack.json, railway-build.mjs)
+  - HTTP transport: JSON response mode enabled; session count gauge removed
+  - Config: Railway PORT environment variable fallback
+  - Network fetch: simplified implementation
+  - Telemetry metrics: disabled observable metric callbacks
+
+The original copyright notice and license terms are preserved in the LICENSE file.

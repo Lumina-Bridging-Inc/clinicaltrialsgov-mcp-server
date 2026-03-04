@@ -6,6 +6,9 @@
  * environment-agnostic (e.g., Node.js, Cloudflare Workers).
  *
  * @module src/config/index
+ *
+ * This file has been modified from the original source.
+ * Changes: Added Railway PORT environment variable fallback (env.PORT).
  */
 import dotenv from 'dotenv';
 import { z } from 'zod';

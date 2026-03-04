@@ -6,6 +6,10 @@
  * Implements MCP Specification 2025-06-18 Streamable HTTP Transport.
  * @see {@link https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http | MCP Streamable HTTP Transport}
  * @module src/mcp-server/transports/http/httpTransport
+ *
+ * This file has been modified from the original source.
+ * Changes: Removed OTel session count gauge; enabled JSON response mode in
+ * StreamableHTTPTransport constructor for Railway compatibility.
  */
 
 import { StreamableHTTPTransport } from '@hono/mcp';

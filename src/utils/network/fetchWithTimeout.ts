@@ -2,6 +2,9 @@
  * @fileoverview Provides a utility function to make fetch requests with a specified timeout
  * and optional SSRF protection.
  * @module src/utils/network/fetchWithTimeout
+ *
+ * This file has been modified from the original source.
+ * Changes: Simplified fetch implementation; removed OTel span wrapping and HTTP status attributes.
  */
 // Adjusted import path
 import { JsonRpcErrorCode, McpError } from '@/types-global/errors.js';

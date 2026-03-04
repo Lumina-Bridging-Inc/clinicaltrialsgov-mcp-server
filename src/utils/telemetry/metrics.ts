@@ -3,6 +3,10 @@
  * Provides simplified interfaces for creating and managing counters, histograms,
  * gauges, and observable metrics. Supports both Node and Worker environments.
  * @module src/utils/telemetry/metrics
+ *
+ * This file has been modified from the original source.
+ * Changes: Disabled observable metric callbacks in createObservableGauge,
+ * createObservableCounter, and createObservableUpDownCounter.
  */
 import {
   metrics,

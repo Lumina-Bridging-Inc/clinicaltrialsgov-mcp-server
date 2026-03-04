@@ -4,6 +4,9 @@
  * records results to OpenTelemetry plus structured logs. No manual spans beyond
  * the single wrapper span here per project guidelines.
  * @module src/utils/internal/performance
+ *
+ * This file has been modified from the original source.
+ * Changes: Removed OTel metrics registry recording from measureToolExecution.
  */
 import { SpanStatusCode, trace } from '@opentelemetry/api';
 import type { performance as PerfHooksPerformance } from 'node:perf_hooks';
