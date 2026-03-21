@@ -459,7 +459,7 @@ describe('OAuth Strategy', () => {
       expect(authInfo.clientId).toBe('test-client');
     });
 
-    it('should throw Unauthorized for missing client_id claim', async () => {
+    it('should throw Unauthorized for missing client_id/azp/cid claim', async () => {
       mockJwtVerify.mockResolvedValue({
         payload: {
           scope: 'read write',
@@ -470,28 +470,121 @@ describe('OAuth Strategy', () => {
 
       await expect(strategy.verify('token')).rejects.toThrow(McpError);
       await expect(strategy.verify('token')).rejects.toThrow(
-        /must contain a 'client_id' claim/,
+        /must contain a 'client_id', 'azp', or 'cid' claim/,
       );
     });
 
-    it('should throw Unauthorized for missing scope claim', async () => {
+    it('should extract client_id from azp claim (Zitadel)', async () => {
       mockJwtVerify.mockResolvedValue({
         payload: {
-          client_id: 'test-client',
+          azp: 'zitadel-client-id',
+          scope: 'openid profile',
         },
         protectedHeader: { alg: 'RS256' },
         key: {} as any,
       } as any);
 
-      await expect(strategy.verify('token')).rejects.toThrow(McpError);
-      await expect(strategy.verify('token')).rejects.toThrow(
-        /must contain valid, non-empty scopes/,
-      );
+      const authInfo = await strategy.verify('token');
+
+      expect(authInfo.clientId).toBe('zitadel-client-id');
     });
 
-    it('should accept empty scope string (results in single empty string scope)', async () => {
-      // Note: ''.split(' ') returns [''] not [], so length check passes
-      // This is existing behavior - empty string creates array with one empty string
+    it('should extract client_id from cid claim', async () => {
+      mockJwtVerify.mockResolvedValue({
+        payload: {
+          cid: 'cid-client',
+          scope: 'read',
+        },
+        protectedHeader: { alg: 'RS256' },
+        key: {} as any,
+      } as any);
+
+      const authInfo = await strategy.verify('token');
+
+      expect(authInfo.clientId).toBe('cid-client');
+    });
+
+    it('should prefer client_id over azp for client ID', async () => {
+      mockJwtVerify.mockResolvedValue({
+        payload: {
+          client_id: 'from-client-id',
+          azp: 'from-azp',
+          scope: 'read',
+        },
+        protectedHeader: { alg: 'RS256' },
+        key: {} as any,
+      } as any);
+
+      const authInfo = await strategy.verify('token');
+
+      expect(authInfo.clientId).toBe('from-client-id');
+    });
+
+    it('should extract tenant ID from Zitadel org claim', async () => {
+      mockJwtVerify.mockResolvedValue({
+        payload: {
+          client_id: 'test-client',
+          scope: 'read',
+          'urn:zitadel:iam:user:resourceowner:id': 'org-123',
+        },
+        protectedHeader: { alg: 'RS256' },
+        key: {} as any,
+      } as any);
+
+      const authInfo = await strategy.verify('token');
+
+      expect(authInfo.tenantId).toBe('org-123');
+    });
+
+    it('should prefer tid over Zitadel org claim for tenant ID', async () => {
+      mockJwtVerify.mockResolvedValue({
+        payload: {
+          client_id: 'test-client',
+          scope: 'read',
+          tid: 'tenant-from-tid',
+          'urn:zitadel:iam:user:resourceowner:id': 'org-from-zitadel',
+        },
+        protectedHeader: { alg: 'RS256' },
+        key: {} as any,
+      } as any);
+
+      const authInfo = await strategy.verify('token');
+
+      expect(authInfo.tenantId).toBe('tenant-from-tid');
+    });
+
+    it('should allow tokens without scope claim (Zitadel default)', async () => {
+      mockJwtVerify.mockResolvedValue({
+        payload: {
+          azp: 'zitadel-client',
+          sub: 'user-123',
+        },
+        protectedHeader: { alg: 'RS256' },
+        key: {} as any,
+      } as any);
+
+      const authInfo = await strategy.verify('token');
+
+      expect(authInfo.clientId).toBe('zitadel-client');
+      expect(authInfo.scopes).toEqual([]);
+    });
+
+    it('should extract scopes from scp array claim', async () => {
+      mockJwtVerify.mockResolvedValue({
+        payload: {
+          client_id: 'test-client',
+          scp: ['read', 'write', 'admin'],
+        },
+        protectedHeader: { alg: 'RS256' },
+        key: {} as any,
+      } as any);
+
+      const authInfo = await strategy.verify('token');
+
+      expect(authInfo.scopes).toEqual(['read', 'write', 'admin']);
+    });
+
+    it('should handle empty scope string gracefully', async () => {
       mockJwtVerify.mockResolvedValue({
         payload: {
           client_id: 'test-client',
@@ -503,8 +596,7 @@ describe('OAuth Strategy', () => {
 
       const authInfo = await strategy.verify('token');
 
-      // Current implementation allows this - scope '' becomes ['']
-      expect(authInfo.scopes).toEqual(['']);
+      expect(authInfo.scopes).toEqual([]);
     });
 
     it('should throw Unauthorized for expired token', async () => {

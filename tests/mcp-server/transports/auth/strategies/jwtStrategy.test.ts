@@ -178,8 +178,53 @@ describe('JwtStrategy', () => {
 
       await expect(strategy.verify(token)).rejects.toThrow(McpError);
       await expect(strategy.verify(token)).rejects.toThrow(
-        /missing 'cid' or 'client_id'/,
+        /missing 'cid', 'client_id', or 'azp'/,
       );
+    });
+
+    it('should verify valid JWT token with azp claim (Zitadel)', async () => {
+      const token = await new SignJWT({
+        azp: 'zitadel-client-id',
+        scope: 'openid profile',
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime('1h')
+        .sign(testSecretBytes);
+
+      const authInfo = await strategy.verify(token);
+
+      expect(authInfo.clientId).toBe('zitadel-client-id');
+    });
+
+    it('should extract tenant ID from Zitadel org claim', async () => {
+      const token = await new SignJWT({
+        azp: 'zitadel-client',
+        scope: 'openid',
+        'urn:zitadel:iam:user:resourceowner:id': 'org-789',
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime('1h')
+        .sign(testSecretBytes);
+
+      const authInfo = await strategy.verify(token);
+
+      expect(authInfo.tenantId).toBe('org-789');
+    });
+
+    it('should prefer tid over Zitadel org claim for tenant ID', async () => {
+      const token = await new SignJWT({
+        cid: 'test-client',
+        scp: ['tool:read'],
+        tid: 'tenant-from-tid',
+        'urn:zitadel:iam:user:resourceowner:id': 'org-from-zitadel',
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime('1h')
+        .sign(testSecretBytes);
+
+      const authInfo = await strategy.verify(token);
+
+      expect(authInfo.tenantId).toBe('tenant-from-tid');
     });
 
     it('should throw error for missing scopes claim', async () => {

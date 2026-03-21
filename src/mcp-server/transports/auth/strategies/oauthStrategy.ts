@@ -133,34 +133,53 @@ export class OauthStrategy implements AuthStrategy {
       }
 
       const scopes =
-        typeof payload.scope === 'string' ? payload.scope.split(' ') : [];
+        typeof payload.scope === 'string'
+          ? payload.scope.split(' ').filter(Boolean)
+          : Array.isArray(payload.scp) &&
+              payload.scp.every((s: unknown) => typeof s === 'string')
+            ? payload.scp
+            : [];
       if (scopes.length === 0) {
         this.logger.warning(
-          "Invalid token: missing or empty 'scope' claim.",
+          "Token has no 'scope' or 'scp' claim. Defaulting to empty scopes. " +
+            'If using Zitadel, consider adding a scope claim via Zitadel Actions.',
           context,
-        );
-        throw new McpError(
-          JsonRpcErrorCode.Unauthorized,
-          'Token must contain valid, non-empty scopes.',
         );
       }
 
+      // Support multiple client ID claim names:
+      // - client_id: OAuth 2.1 standard
+      // - azp: Zitadel (authorized party)
+      // - cid: Some identity providers
       const clientId =
-        typeof payload.client_id === 'string' ? payload.client_id : undefined;
+        typeof payload.client_id === 'string'
+          ? payload.client_id
+          : typeof payload.azp === 'string'
+            ? payload.azp
+            : typeof payload.cid === 'string'
+              ? payload.cid
+              : undefined;
       if (!clientId) {
         this.logger.warning(
-          "Invalid token: missing 'client_id' claim.",
+          "Invalid token: missing 'client_id', 'azp', or 'cid' claim.",
           context,
         );
         throw new McpError(
           JsonRpcErrorCode.Unauthorized,
-          "Token must contain a 'client_id' claim.",
+          "Token must contain a 'client_id', 'azp', or 'cid' claim.",
         );
       }
 
       const subject = typeof payload.sub === 'string' ? payload.sub : undefined;
+      // Support multiple tenant ID claim names:
+      // - tid: Standard tenant ID claim
+      // - urn:zitadel:iam:user:resourceowner:id: Zitadel organization ID
       const tenantId =
-        typeof payload.tid === 'string' ? payload.tid : undefined;
+        typeof payload.tid === 'string'
+          ? payload.tid
+          : typeof payload['urn:zitadel:iam:user:resourceowner:id'] === 'string'
+            ? payload['urn:zitadel:iam:user:resourceowner:id']
+            : undefined;
       const authInfo: AuthInfo = {
         token,
         clientId,

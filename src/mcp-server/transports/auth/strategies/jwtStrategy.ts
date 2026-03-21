@@ -92,21 +92,27 @@ export class JwtStrategy implements AuthStrategy {
         claims: decoded,
       });
 
+      // Support multiple client ID claim names:
+      // - cid: Common in some identity providers
+      // - client_id: OAuth 2.1 standard
+      // - azp: Zitadel (authorized party)
       const clientId =
         typeof decoded.cid === 'string'
           ? decoded.cid
           : typeof decoded.client_id === 'string'
             ? decoded.client_id
-            : undefined;
+            : typeof decoded.azp === 'string'
+              ? decoded.azp
+              : undefined;
 
       if (!clientId) {
         this.logger.warning(
-          "Invalid token: missing 'cid' or 'client_id' claim.",
+          "Invalid token: missing 'cid', 'client_id', or 'azp' claim.",
           context,
         );
         throw new McpError(
           JsonRpcErrorCode.Unauthorized,
-          "Invalid token: missing 'cid' or 'client_id' claim.",
+          "Invalid token: missing 'cid', 'client_id', or 'azp' claim.",
         );
       }
 
@@ -131,8 +137,15 @@ export class JwtStrategy implements AuthStrategy {
         );
       }
 
+      // Support multiple tenant ID claim names:
+      // - tid: Standard tenant ID claim
+      // - urn:zitadel:iam:user:resourceowner:id: Zitadel organization ID
       const tenantId =
-        typeof decoded.tid === 'string' ? decoded.tid : undefined;
+        typeof decoded.tid === 'string'
+          ? decoded.tid
+          : typeof decoded['urn:zitadel:iam:user:resourceowner:id'] === 'string'
+            ? decoded['urn:zitadel:iam:user:resourceowner:id']
+            : undefined;
 
       const authInfo: AuthInfo = {
         token,
