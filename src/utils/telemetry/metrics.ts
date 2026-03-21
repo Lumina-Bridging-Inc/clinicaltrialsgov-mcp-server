@@ -3,10 +3,6 @@
  * Provides simplified interfaces for creating and managing counters, histograms,
  * gauges, and observable metrics. Supports both Node and Worker environments.
  * @module src/utils/telemetry/metrics
- *
- * This file has been modified from the original source.
- * Changes: Disabled observable metric callbacks in createObservableGauge,
- * createObservableCounter, and createObservableUpDownCounter.
  */
 import {
   metrics,
@@ -166,12 +162,16 @@ export function createHistogram(
 export function createObservableGauge(
   name: string,
   description: string,
-  _callback: () => Promise<number> | number,
+  callback: () => number,
   unit?: string,
 ): ObservableGauge {
   const meter = getMeter();
   const options = unit ? { description, unit } : { description };
-  return meter.createObservableGauge(name, options);
+  const gauge = meter.createObservableGauge(name, options);
+  gauge.addCallback((result) => {
+    result.observe(callback());
+  });
+  return gauge;
 }
 
 /**
@@ -199,11 +199,15 @@ export function createObservableGauge(
 export function createObservableCounter(
   name: string,
   description: string,
-  _callback: () => Promise<number> | number,
+  callback: () => number,
   unit = '1',
 ) {
   const meter = getMeter();
-  return meter.createObservableCounter(name, { description, unit });
+  const counter = meter.createObservableCounter(name, { description, unit });
+  counter.addCallback((result) => {
+    result.observe(callback());
+  });
+  return counter;
 }
 
 /**
@@ -230,9 +234,16 @@ export function createObservableCounter(
 export function createObservableUpDownCounter(
   name: string,
   description: string,
-  _callback: () => Promise<number> | number,
+  callback: () => number,
   unit = '1',
 ) {
   const meter = getMeter();
-  return meter.createObservableUpDownCounter(name, { description, unit });
+  const counter = meter.createObservableUpDownCounter(name, {
+    description,
+    unit,
+  });
+  counter.addCallback((result) => {
+    result.observe(callback());
+  });
+  return counter;
 }

@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 // Railway build script — uses a Bun plugin to resolve @/ path aliases.
 // Bun 1.3.2's Bun.build `alias` option handles package aliases only,
 // not tsconfig path patterns. The onResolve plugin intercepts @/* imports
@@ -5,7 +6,10 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'src');
+const srcDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'src',
+);
 
 const result = await Bun.build({
   entrypoints: ['./src/index.ts'],
