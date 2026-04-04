@@ -1,8 +1,12 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Agent Protocol
 
-**Version:** 1.8.1
+**Version:** 1.9.0
 **Project:** clinicaltrialsgov-mcp-server
-**Updated:** 2026-02-27
+**Updated:** 2026-03-21
 **npm:** [clinicaltrialsgov-mcp-server](https://www.npmjs.com/package/clinicaltrialsgov-mcp-server)
 **Docker:** [ghcr.io/cyanheads/clinicaltrialsgov-mcp-server](https://ghcr.io/cyanheads/clinicaltrialsgov-mcp-server)
 
@@ -155,6 +159,7 @@ From `@/utils/index.js`:
 | `network/`    | `fetchWithTimeout`                                                                                                    |
 | `scheduling/` | `scheduler` (node-cron wrapper)                                                                                       |
 | `internal/`   | `logger`, `requestContextService`, `ErrorHandler`, `performance`                                                      |
+| `metrics/`    | `metricsRegistry` (counters, histograms, observable gauges), `tokenCounter`                                           |
 | `telemetry/`  | OpenTelemetry instrumentation                                                                                         |
 
 ---
@@ -165,7 +170,13 @@ From `@/utils/index.js`:
 
 - JWT: local secret (`MCP_AUTH_SECRET_KEY`), dev bypasses if missing
 - OAuth: JWKS verification (`OAUTH_ISSUER_URL`, `OAUTH_AUDIENCE`, opt `OAUTH_JWKS_URI`)
-- Claims: `clientId` (cid/client_id), `scopes` (scp/scope), `sub`, `tenantId` (tid -> context.tenantId)
+- Claims (with fallback priority):
+  - `clientId`: `client_id` > `azp` > `cid`
+  - `scopes`: `scope` (space-separated string) or `scp` (array)
+  - `subject`: `sub`
+  - `tenantId`: `tid` > `urn:zitadel:iam:user:resourceowner:id`
+- Zitadel-compatible: see [docs/zitadel-auth-setup.md](docs/zitadel-auth-setup.md)
+- **Zitadel constraint:** Do NOT set `MCP_SERVER_RESOURCE_IDENTIFIER` — Zitadel does not support RFC 8707 resource indicators and token validation will fail if it is set
 - Wrap logic with `withToolAuth`/`withResourceAuth` (defaults allowed if auth disabled)
 
 **STDIO mode:** No HTTP auth. Host handles authorization.
@@ -257,6 +268,15 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 Remind the user to run these after completing a release flow.
 
+### Railway Deployment
+
+The server deploys to Railway via Railpack (`railway.toml`). Railway auto-deploys on push to `main`.
+
+- `railway.toml` `watchPatterns` limits deploys to source/config changes only (excludes `docs/`, `tests/`, etc.)
+- Build: `railway-build.mjs` (Bun.build with `@/` path alias plugin)
+- Start: `bun run dist/index.js`
+- Set env vars in Railway dashboard (see `.env.example` for full list)
+
 ---
 
 ## Commands
@@ -291,7 +311,7 @@ All config validated via Zod in `src/config/index.ts`. Config module derives `mc
 
 **Tenant ID validation:** max 128 chars, alphanumeric/hyphens/underscores/dots only, start/end alphanumeric, no path traversal (`../`), no consecutive dots.
 
-**HTTP with auth:** `tenantId` auto-extracted from JWT `'tid'` claim, propagated via `requestContextService.withAuthInfo(authInfo)`.
+**HTTP with auth:** `tenantId` auto-extracted from JWT `tid` claim (falls back to `urn:zitadel:iam:user:resourceowner:id`), propagated via `requestContextService.withAuthInfo(authInfo)`.
 
 **STDIO:** explicitly set tenant via `requestContextService.createRequestContext({ operation, tenantId })`.
 

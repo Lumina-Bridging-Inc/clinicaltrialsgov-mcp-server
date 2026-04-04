@@ -117,6 +117,7 @@ OAUTH_AUDIENCE=YOUR_PROJECT_ID
 
 # Zitadel's JWKS endpoint (must be set explicitly — Zitadel uses
 # /oauth/v2/keys, not the /.well-known/jwks.json default)
+# NOTE: older deployments may still be on v1 — see "Migrating from v1 to v2" below
 OAUTH_JWKS_URI=https://your-instance.zitadel.cloud/oauth/v2/keys
 ```
 
@@ -230,6 +231,94 @@ The MCP server automatically maps Zitadel's JWT claims to its internal auth mode
 | `subject` | `sub` | — | The Zitadel user ID |
 | `tenantId` | `urn:zitadel:iam:user:resourceowner:id` | `tid` | The Zitadel organization ID; used for multi-tenant storage isolation |
 | `scopes` | `scope` (space-separated string) | `scp` (array) | Requires Zitadel Actions to inject; empty by default |
+
+## Migrating from v1 to v2
+
+Zitadel introduced v2 OAuth/OIDC endpoints in Zitadel v2.x. When first deploying, especially against an older Zitadel instance or following older guides, you may have been directed to the v1 endpoints. The MCP server requires the v2 JWKS endpoint for token validation.
+
+### How to tell which version you are on
+
+Check the OIDC discovery document for your Zitadel instance:
+
+```bash
+curl https://your-instance.zitadel.cloud/.well-known/openid-configuration | python3 -m json.tool | grep -E '"jwks_uri"|"token_endpoint"'
+```
+
+- **v1 response:** `"token_endpoint": "https://…/oauth/v1/token"`, `"jwks_uri": "https://…/oauth/v1/keys"`
+- **v2 response:** `"token_endpoint": "https://…/oauth/v2/token"`, `"jwks_uri": "https://…/oauth/v2/keys"`
+
+If the discovery document returns v2 endpoints but you had manually hardcoded v1 paths, update them as described below.
+
+### What changes
+
+| What | v1 (old) | v2 (new) |
+|---|---|---|
+| Token endpoint | `/oauth/v1/token` | `/oauth/v2/token` |
+| JWKS endpoint | `/oauth/v1/keys` | `/oauth/v2/keys` |
+| Authorization endpoint | `/oauth/v1/authorize` | `/oauth/v2/authorize` |
+
+The MCP server only consumes the JWKS endpoint (`OAUTH_JWKS_URI`). The token endpoint is used by clients obtaining tokens (curl, SDKs, MCP connectors) — update both.
+
+### Steps to migrate
+
+1. **Update the MCP server env var** on your deployment (Railway dashboard or `.env`):
+
+   ```env
+   # Change this:
+   OAUTH_JWKS_URI=https://your-instance.zitadel.cloud/oauth/v1/keys
+   # To this:
+   OAUTH_JWKS_URI=https://your-instance.zitadel.cloud/oauth/v2/keys
+   ```
+
+2. **Update any client-side token requests** that hardcode the v1 token endpoint:
+
+   ```bash
+   # Old (v1):
+   curl -X POST https://your-instance.zitadel.cloud/oauth/v1/token …
+   # New (v2):
+   curl -X POST https://your-instance.zitadel.cloud/oauth/v2/token …
+   ```
+
+3. **Redeploy / restart** the MCP server so the new `OAUTH_JWKS_URI` takes effect. The JWKS cache will refresh on next request.
+
+4. **Verify** by re-running the health and token tests in Step 5. If the JWKS fetch now succeeds, tokens signed by Zitadel will validate correctly.
+
+### If your Zitadel instance only serves v1
+
+If you are running a self-hosted Zitadel instance that predates v2 OIDC endpoints, upgrade the Zitadel instance itself to v2.x. The v1 endpoints are deprecated. Zitadel Cloud instances have already been migrated.
+
+---
+
+## Reference Implementation
+
+This server is the **canonical reference implementation** for Zitadel OAuth 2.1 authentication across the MCP server family. When implementing Zitadel auth in another server (e.g., Oncology MCP, HC-DPD MCP), use these files as the source of truth:
+
+| File | What it implements |
+|---|---|
+| `src/mcp-server/transports/auth/strategies/oauthStrategy.ts` | JWKS fetch + RS256 token validation against Zitadel's `/oauth/v2/keys` endpoint |
+| `src/mcp-server/transports/auth/strategies/jwtStrategy.ts` | Zitadel-specific claim mapping (`azp`, `urn:zitadel:iam:user:resourceowner:id`) |
+| `src/mcp-server/transports/auth/authMiddleware.ts` | Bearer token extraction from `Authorization` header |
+| `src/mcp-server/transports/auth/authFactory.ts` | Strategy selection via `MCP_AUTH_MODE` env var |
+
+### Critical Zitadel Constraint
+
+> **Zitadel does not support RFC 8707 Resource Indicators.** Do NOT set `MCP_SERVER_RESOURCE_IDENTIFIER` in any server using Zitadel as the identity provider. Doing so will cause token validation to fail because Zitadel will not include the resource indicator in the token's claims.
+
+### Standardized Environment Variables
+
+All servers in this family should use the same env var names for consistency:
+
+```env
+MCP_AUTH_MODE=oauth
+OAUTH_ISSUER_URL=https://your-instance.zitadel.cloud
+OAUTH_AUDIENCE=<zitadel-project-id>
+OAUTH_JWKS_URI=https://your-instance.zitadel.cloud/oauth/v2/keys
+OAUTH_JWKS_COOLDOWN_MS=300000
+OAUTH_JWKS_TIMEOUT_MS=5000
+# Do NOT set MCP_SERVER_RESOURCE_IDENTIFIER
+```
+
+---
 
 ## Troubleshooting
 
